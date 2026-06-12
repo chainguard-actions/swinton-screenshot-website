@@ -1,0 +1,33 @@
+name: Test basic URL screenshot
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - id: action
+        uses: .
+        with:
+          source: 'https://example.com'
+          destination: 'screenshot.png'
+      - name: Assert output path is set
+        env:
+          ACTUAL: ${{ steps.action.outputs.path }}
+        run: |
+          echo "actual path: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
+            echo "FAIL: expected output path to be non-empty"
+            exit 1
+          fi
+          echo "PASS: output path is $ACTUAL"
+      - name: Assert screenshot file exists
+        env:
+          ACTUAL: ${{ steps.action.outputs.path }}
+        run: |
+          echo "checking file: $ACTUAL"
+          if [ ! -f "$ACTUAL" ]; then
+            echo "FAIL: screenshot file not found at $ACTUAL"
+            exit 1
+          fi
+          echo "PASS: screenshot file exists"
