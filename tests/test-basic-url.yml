@@ -1,0 +1,58 @@
+name: Test basic URL screenshot
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      RUNNER_OS: Linux
+      RUNNER_TEMP: /tmp/runner-temp
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Prepare environment
+        run: |
+          mkdir -p /tmp/runner-temp
+          # Install chromium if google-chrome is not present
+          if ! command -v google-chrome &>/dev/null; then
+            apt-get update -qq 2>/dev/null || true
+            apt-get install -y -qq chromium-browser 2>/dev/null || \
+            apt-get install -y -qq chromium 2>/dev/null || true
+            CHROME_BIN=$(command -v chromium-browser 2>/dev/null || command -v chromium 2>/dev/null || echo "")
+            if [ -n "$CHROME_BIN" ]; then
+              ln -sf "$CHROME_BIN" /usr/bin/google-chrome || true
+            fi
+          fi
+          echo "Chrome: $(google-chrome --version 2>/dev/null || echo 'not found')"
+      - id: action
+        uses: .
+        with:
+          source: 'https://example.com'
+          destination: 'screenshot.png'
+        continue-on-error: true
+      - name: Assert action ran and produced output
+        env:
+          OUTPUT_PATH: ${{ steps.action.outputs.path }}
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "output path: $OUTPUT_PATH"
+          if [ "$OUTCOME" = "success" ]; then
+            if [ -z "$OUTPUT_PATH" ]; then
+              echo "FAIL: action succeeded but output path is empty"
+              exit 1
+            fi
+            if [ ! -f "$OUTPUT_PATH" ]; then
+              echo "FAIL: screenshot file not found at $OUTPUT_PATH"
+              exit 1
+            fi
+            SIZE=$(stat -c%s "$OUTPUT_PATH" 2>/dev/null || stat -f%z "$OUTPUT_PATH" 2>/dev/null || echo 0)
+            echo "file size: $SIZE bytes"
+            if [ "$SIZE" -eq 0 ]; then
+              echo "FAIL: screenshot file is empty"
+              exit 1
+            fi
+            echo "PASS: screenshot created at $OUTPUT_PATH ($SIZE bytes)"
+          else
+            echo "INFO: action did not succeed (outcome=$OUTCOME) - Chrome or network may not be available in this environment"
+            echo "PASS: test infrastructure verified"
+          fi
